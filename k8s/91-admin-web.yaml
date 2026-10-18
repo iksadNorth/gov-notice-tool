@@ -1,0 +1,52 @@
+# gov-notice 관리 페이지 — nginx (정적 파일 서빙 + /api 리버스프록시).
+# VIP: 192.168.0.60 (MetalLB pool .50-.60으로 확장, realestimate/k8s/metallb/pool.yaml 참고)
+apiVersion: v1
+kind: Service
+metadata:
+  name: gov-notice-admin-web
+  namespace: default
+  labels:
+    app: gov-notice-admin-web
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.0.60
+spec:
+  type: LoadBalancer
+  selector:
+    app: gov-notice-admin-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gov-notice-admin-web
+  namespace: default
+  labels:
+    app: gov-notice-admin-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gov-notice-admin-web
+  template:
+    metadata:
+      labels:
+        app: gov-notice-admin-web
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ml
+      containers:
+        - name: admin-web
+          image: localhost:5000/gov-notice-admin-web:0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: "0.2"
+              memory: 64Mi

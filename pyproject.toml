@@ -1,0 +1,32 @@
+[project]
+name = "gov-notice"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "iksadnorth", email = "iksadnorth@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20.0",
+    "apscheduler>=3.11.3",
+    "beautifulsoup4>=4.15.0",
+    "fastapi>=0.143.0",
+    "mcp[cli]>=2.2.0",
+    "minio>=7.2.20",
+    "ollama>=0.6.3",
+    "pgvector>=0.5.0",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.1.1",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+gov-notice = "gov_notice:main"
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"

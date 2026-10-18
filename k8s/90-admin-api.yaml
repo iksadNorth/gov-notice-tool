@@ -1,0 +1,84 @@
+# gov-notice 관리용 FastAPI 백엔드. ClusterIP — 외부 노출은 admin-web(nginx)이 담당.
+# in-cluster라 DB_HOST는 클러스터 내부 서비스 DNS 사용 (호스트에서 돌리던 pipeline.py와 다름).
+apiVersion: v1
+kind: Service
+metadata:
+  name: gov-notice-admin-api
+  namespace: default
+  labels:
+    app: gov-notice-admin-api
+spec:
+  type: ClusterIP
+  selector:
+    app: gov-notice-admin-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gov-notice-admin-api
+  namespace: default
+  labels:
+    app: gov-notice-admin-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gov-notice-admin-api
+  template:
+    metadata:
+      labels:
+        app: gov-notice-admin-api
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ml
+      containers:
+        - name: admin-api
+          image: localhost:5000/gov-notice-admin-api:0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_HOST
+              value: postgres.default.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: gov_notice
+            - name: DB_USER
+              value: airflow
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: realestimate-secrets
+                  key: POSTGRES_PASSWORD
+            # MinIO/Telegram은 이 화면(프로필/목록/상세)에서 안 쓰지만
+            # config.py의 Settings가 전부 required라 더미값을 넣어줘야 기동됨.
+            # Ollama는 실제로 씀 — 프로필 저장 시 임베딩 계산(upsert_profile)에 필요.
+            # ollama는 k8s 밖 호스트 docker 컨테이너라 노드 LAN IP로 접근(0.0.0.0 바인딩 확인함).
+            - name: MINIO_ENDPOINT
+              value: minio.default.svc.cluster.local:9000
+            - name: MINIO_ACCESS_KEY
+              value: unused
+            - name: MINIO_SECRET_KEY
+              value: unused
+            - name: MINIO_BUCKET
+              value: gov-notice-raw
+            - name: OLLAMA_HOST
+              value: http://192.168.0.10:11434
+            - name: OLLAMA_MODEL
+              value: unused
+            - name: TELEGRAM_BOT_TOKEN
+              value: unused
+            - name: TELEGRAM_CHAT_ID
+              value: unused
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "0.5"
+              memory: 256Mi

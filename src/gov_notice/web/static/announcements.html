@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>공고 목록</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="profiles.html">내 정보 관리</a>
+    <a href="announcements.html">공고 목록</a>
+  </nav>
+  <h1>공고 목록</h1>
+
+  <div class="card">
+    <label>적합 여부</label>
+    <select id="search_eligible">
+      <option value="">전체</option>
+      <option value="true">적합</option>
+      <option value="false">부적합</option>
+    </select>
+    <br><br>
+    <label>기관</label>
+    <input id="search_agency" placeholder="예: 금융위원회">
+    <br><br>
+    <label>제목</label>
+    <input id="search_title" placeholder="제목 일부 검색">
+    <br><br>
+    <button onclick="search()">검색</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>기관</th><th>제목</th><th>게시일</th><th>적합여부</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="pagination" id="pagination"></div>
+
+  <script src="api.js"></script>
+  <script>
+    // URL 쿼리스트링을 그대로 검색 상태로 씀 — 새로고침/링크 공유해도 조건 유지됨
+    const params = new URLSearchParams(location.search);
+    let page = parseInt(params.get('page')) || 1;
+    const eligibleParam = params.get('is_eligible') ?? '';
+    const agencyParam = params.get('agency') ?? '';
+    const titleParam = params.get('title') ?? '';
+
+    document.getElementById('search_eligible').value = eligibleParam;
+    document.getElementById('search_agency').value = agencyParam;
+    document.getElementById('search_title').value = titleParam;
+
+    function buildQuery(targetPage) {
+      const eligible = document.getElementById('search_eligible').value;
+      const agencyVal = document.getElementById('search_agency').value;
+      const titleVal = document.getElementById('search_title').value;
+
+      const q = new URLSearchParams();
+      q.set('page', targetPage);
+      // 값 없는 필터는 그냥 안 넣음
+      if (eligible) q.set('is_eligible', eligible);
+      if (agencyVal) q.set('agency', agencyVal);
+      if (titleVal) q.set('title', titleVal);
+      return q;
+    }
+
+    function search() {
+      location.href = 'announcements.html?' + buildQuery(1).toString();
+    }
+
+    function eligibleBadge(value) {
+      if (value === null) return '-';
+      return value
+        ? '<span class="badge-true">적합</span>'
+        : '<span class="badge-false">부적합</span>';
+    }
+
+    async function load() {
+      const apiQuery = buildQuery(page);
+      apiQuery.set('page_size', 20);
+      const result = await apiGet(`/api/announcements?${apiQuery.toString()}`);
+      const rows = document.getElementById('rows');
+
+      // 공고가 하나도 없으면 안내만
+      if (result.items.length === 0) {
+        rows.innerHTML = '<tr><td colspan="4">공고가 없습니다.</td></tr>';
+      } else {
+        rows.innerHTML = result.items.map(a => `
+          <tr>
+            <td>${a.agency_name}</td>
+            <td><a href="announcement_detail.html?id=${a.id}">${a.title}</a></td>
+            <td>${a.published_at ?? '-'}</td>
+            <td>${eligibleBadge(a.is_eligible)}</td>
+          </tr>
+        `).join('');
+      }
+
+      const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
+      const pagination = document.getElementById('pagination');
+      let html = '';
+      for (let p = 1; p <= totalPages; p++) {
+        const q = buildQuery(p);
+        html += p === page
+          ? `<b>${p}</b>`
+          : `<a href="announcements.html?${q.toString()}">${p}</a>`;
+      }
+      pagination.innerHTML = html;
+    }
+
+    load();
+  </script>
+</body>
+</html>

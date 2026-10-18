@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>내 정보 관리</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="profiles.html">내 정보 관리</a>
+    <a href="announcements.html">공고 목록</a>
+  </nav>
+  <h1>내 정보 관리</h1>
+
+  <div id="list"></div>
+
+  <h2>추가 / 수정</h2>
+  <!-- edit_label이 비어있으면 신규 생성, 있으면 수정(기존 label 기준으로 PUT) -->
+  <input type="hidden" id="edit_label">
+  <div class="card">
+    <label>프로필 이름 (label)</label>
+    <input id="label" placeholder="예: 본인">
+    <br><br>
+    <label>정보 (JSON, 키는 한글로)</label>
+    <textarea id="data" rows="6">{"생년월일": "1995-03-01", "월급": 2800000, "거주지역": "서울", "재직상태": "재직"}</textarea>
+    <br><br>
+    <label><input type="checkbox" id="is_active" checked style="width:auto"> 판별 대상으로 사용</label>
+    <br><br>
+    <button onclick="save()">저장</button>
+    <button onclick="resetForm()">초기화</button>
+  </div>
+
+  <script src="api.js"></script>
+  <script>
+    async function load() {
+      const profiles = await apiGet('/api/profiles');
+      const list = document.getElementById('list');
+
+      // 프로필이 하나도 없으면 안내만 띄움
+      if (profiles.length === 0) {
+        list.innerHTML = '<p>등록된 프로필이 없습니다.</p>';
+        return;
+      }
+
+      list.innerHTML = profiles.map(p => `
+        <div class="card">
+          <b>${p.label}</b> ${p.is_active ? '' : '(비활성)'}
+          <pre>${JSON.stringify(p.data, null, 2)}</pre>
+          <button onclick='editProfile(${JSON.stringify(p)})'>수정</button>
+          <button onclick='removeProfile(${JSON.stringify(p.label)})'>삭제</button>
+        </div>
+      `).join('');
+    }
+
+    function editProfile(p) {
+      document.getElementById('edit_label').value = p.label;
+      document.getElementById('label').value = p.label;
+      document.getElementById('data').value = JSON.stringify(p.data, null, 2);
+      document.getElementById('is_active').checked = p.is_active;
+    }
+
+    function resetForm() {
+      document.getElementById('edit_label').value = '';
+      document.getElementById('label').value = '';
+      document.getElementById('data').value = '{}';
+      document.getElementById('is_active').checked = true;
+    }
+
+    async function save() {
+      const editingLabel = document.getElementById('edit_label').value;
+      const label = document.getElementById('label').value;
+
+      // 가드: label 비어있으면 서버 호출 전에 바로 막음
+      if (!label.trim()) {
+        alert('프로필 이름(label)을 입력해주세요.');
+        return;
+      }
+
+      // JSON 파싱 실패하면 그냥 alert만 띄우고 끝 — 별도 검증 메서드 안 둠
+      let data;
+      try {
+        data = JSON.parse(document.getElementById('data').value);
+      } catch (e) {
+        alert('JSON 형식이 잘못됐습니다: ' + e.message);
+        return;
+      }
+
+      const is_active = document.getElementById('is_active').checked;
+      const body = { label, data, is_active };
+
+      if (editingLabel) {
+        await apiPut(`/api/profiles/${encodeURIComponent(editingLabel)}`, body);
+      } else {
+        await apiPost('/api/profiles', body);
+      }
+      resetForm();
+      load();
+    }
+
+    async function removeProfile(label) {
+      if (!confirm('삭제하시겠습니까? 관련 판별 결과도 같이 삭제됩니다.')) return;
+      await apiDelete(`/api/profiles/${encodeURIComponent(label)}`);
+      load();
+    }
+
+    load();
+  </script>
+</body>
+</html>

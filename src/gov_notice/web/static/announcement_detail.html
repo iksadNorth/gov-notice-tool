@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>공고 상세</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="profiles.html">내 정보 관리</a>
+    <a href="announcements.html">공고 목록</a>
+  </nav>
+  <div id="content">로딩 중...</div>
+
+  <script src="api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+
+    // id가 없으면 바로 목록으로 돌려보냄
+    if (!id) {
+      location.href = 'announcements.html';
+    }
+
+    async function load() {
+      const a = await apiGet(`/api/announcements/${id}`);
+      const content = document.getElementById('content');
+
+      const matchesHtml = a.matches.length === 0
+        ? '<p>아직 판별된 결과가 없습니다.</p>'
+        : a.matches.map(m => `
+            <div class="card">
+              <b>${m.profile_label}</b> —
+              <span class="${m.is_eligible ? 'badge-true' : 'badge-false'}">
+                ${m.is_eligible ? '적합' : '부적합/불명확'}
+              </span>
+              (confidence: ${m.confidence ?? '-'})
+              <p>${m.reason}</p>
+              ${m.missing_info.length > 0
+                ? `<p class="missing">정보 불충분: ${m.missing_info.join(', ')}</p>`
+                : ''}
+              <small>
+                모델: ${m.model_name} / 판별시각: ${m.judged_at ?? '-'} /
+                알림발송: ${m.notified_at ?? '미발송'}
+              </small>
+            </div>
+          `).join('');
+
+      // 매치가 없으면 미리보기 보여줄 것도 없음
+      const previewHtml = a.matches.length === 0
+        ? '<p>아직 판별된 결과가 없어 미리보기도 없습니다.</p>'
+        : a.matches.map(m => `
+            <p><b>${m.profile_label}</b></p>
+            <pre style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${m.telegram_preview}</pre>
+          `).join('<hr>');
+
+      content.innerHTML = `
+        <h1>${a.title}</h1>
+        <p>${a.agency_name} · ${a.published_at ?? '-'} ·
+           <a href="${a.source_url}" target="_blank">원문 보기</a></p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="card">
+            <h3>본문</h3>
+            <pre style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${a.content_text}</pre>
+          </div>
+          <div class="card">
+            <h3>Telegram 메시지 미리보기</h3>
+            ${previewHtml}
+          </div>
+          <div class="card" style="grid-column: 1 / 3;">
+            <h3>LLM 판별 결과</h3>
+            ${matchesHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    load();
+  </script>
+</body>
+</html>
